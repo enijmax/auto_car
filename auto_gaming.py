@@ -15,6 +15,7 @@ x = 0
 y = 0
 w = 640
 h = 480
+
 target_hwnd = None
 stop = False
 label = None
@@ -22,9 +23,10 @@ left_num = 0
 right_num = 0
 up_num = 0
 
-DEPLOY_FILE = "..\\models\\game_models\\20161102\\deploy.prototxt"
-CAFFE_MODE_FILE = "..\\models\\game_models\\20161102\\snapshot_iter_570.caffemodel"
-MEAN_FILE = "..\\models\\game_models\\20161102\\mean.binaryproto"
+FOLDER = "20161116_2_28.0"
+DEPLOY_FILE = "..\\models\\game_models\\"+FOLDER+"\\deploy.prototxt"
+CAFFE_MODE_FILE = "..\\models\\game_models\\"+FOLDER+"\\snapshot_iter_308.caffemodel"
+MEAN_FILE = "..\\models\\game_models\\"+FOLDER+"\\mean.binaryproto"
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -35,8 +37,8 @@ def enumHandler(hwnd, lParam):
 		if 'Speed Dreams 2.1.0-r5801' in win32gui.GetWindowText(hwnd):
 			target_hwnd = hwnd
 			rect = win32gui.GetWindowRect(hwnd)
-			x = rect[0]
-			y = rect[1]
+			x = rect[0] + 3
+			y = rect[1] + 26
 			w = rect[2] - x
 			h = rect[3] - y
 			print "\t     Name: %s" % win32gui.GetWindowText(hwnd)
@@ -52,31 +54,31 @@ def classToLabel(cls):
         return 'right'
 
 def keyPressByCls(cls):
-	if cls == 0:
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_LEFT, 0)
-		time.sleep(0.20)
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_LEFT, 0)
-		time.sleep(0.30)
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
-	elif cls == 1:
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
-		time.sleep(0.5)
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
-	else:
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_RIGHT, 0)
-		time.sleep(0.20)
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_RIGHT, 0)
-		time.sleep(0.30)
-		win32api.PostMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
+    if target_hwnd is None or win32gui.GetWindowText(target_hwnd) != 'Speed Dreams 2.1.0-r5801':
+        print 'No Game window found!'
+        return
+    start_ts = current_milli_time()
+    print 'KeyPressByCls = ', cls
+    if cls == 0:
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_LEFT, 0)
+        while current_milli_time() - start_ts < 300:
+            continue
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_LEFT, 0)
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
+    elif cls == 1:
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
+        while current_milli_time() - start_ts < 500:
+            continue
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
+    else:
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_RIGHT, 0)
+        while current_milli_time() - start_ts < 300:
+            continue
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_RIGHT, 0)
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
 
-def OnKeyboardEvent(event):
-	global stop
-	if event.KeyID == 27: #ESC to leave
-		stop = True
-
-	return True
 
 def get_net(caffemodel, deploy_file, use_gpu=True):
     """
@@ -89,6 +91,7 @@ def get_net(caffemodel, deploy_file, use_gpu=True):
     """
     if use_gpu:
         caffe.set_mode_gpu()
+        caffe.set_device(0)
 
     # load a new model
     return caffe.Net(deploy_file, caffemodel, caffe.TEST)
@@ -182,17 +185,14 @@ def forward_pass(images, net, transformer, batch_size=1):
 
 def OnKeyboardEvent(event):
     global stop, left_num, right_num, up_num, label
+    global w,h,x,y
     kb_time = current_milli_time()
     print 'MessageName:',event.MessageName
     print 'Time:',kb_time
     print 'Key:', event.Key
     print '---'
 
-    if event.KeyID == 27: #ESC to leave
-        stop = True
-        return True
-
-    if event.KeyID in (37, 38, 39):
+    if event.KeyID in (27, 37, 38, 39):
         if event.MessageName == 'key down':
             if event.KeyID == 37:   # left
                 left_num += 1
@@ -200,9 +200,11 @@ def OnKeyboardEvent(event):
             elif event.KeyID == 39: # right
                 right_num += 1
                 label='1'
-            else:                   # up
-                up_num += 1
-                label='0'
+            elif event.KeyID == 37: # up
+                return True
+            elif event.KeyID == 27: # ESC
+                stop = True
+                return True
 
             im = ImageGrab.grab(bbox=(x, y, w, h))
             im.save(label+'/'+str(kb_time)+'.png')
@@ -213,15 +215,7 @@ def OnKeyboardEvent(event):
     return True
 
 def PredictThread():
-    global w,h,x,y
-    # Capture the screen
-    w -= 6
-    h -= 29
-    x += 3
-    y += 26
 
-    net = get_net(CAFFE_MODE_FILE, DEPLOY_FILE, False)
-    transformer = get_transformer(DEPLOY_FILE, MEAN_FILE)
 
     idx = 0
     while stop == False:
@@ -245,17 +239,22 @@ def PredictThread():
 if __name__ == '__main__':
     #freeze_support()
 
+    print "Start!"
+
+    net = get_net(CAFFE_MODE_FILE, DEPLOY_FILE, True)
+    transformer = get_transformer(DEPLOY_FILE, MEAN_FILE)
+
+    thread.start_new_thread(PredictThread, ())
+
     while target_hwnd == None:
+        print 'finding target window handler'
         win32gui.EnumWindows(enumHandler, None)
+        time.sleep(5)
 
     # Send key events, works!
     if target_hwnd == None:
-        print "No window found! Execute game first, Check it 10 sec later"
-        time.sleep(30)
-
-    print "Start!"
-
-    thread.start_new_thread(PredictThread, ())
+        print "No window found!"
+        exit()
 
     # create a hook manager
     hm = pyHook.HookManager()
