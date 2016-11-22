@@ -1,7 +1,8 @@
 import pythoncom, pyHook
 import win32gui, win32ui, win32con, win32api
-import pyscreenshot as ImageGrab
+#import pyscreenshot as ImageGrab
 from PIL import Image
+from PIL import ImageGrab
 #from multiprocessing import Process, freeze_support
 import thread
 import time
@@ -23,9 +24,9 @@ left_num = 0
 right_num = 0
 up_num = 0
 
-FOLDER = "20161116_2_28.0"
+FOLDER = "20161118-181518-32f4_epoch_30.0"
 DEPLOY_FILE = "..\\models\\game_models\\"+FOLDER+"\\deploy.prototxt"
-CAFFE_MODE_FILE = "..\\models\\game_models\\"+FOLDER+"\\snapshot_iter_308.caffemodel"
+CAFFE_MODE_FILE = "..\\models\\game_models\\"+FOLDER+"\\snapshot_iter_420.caffemodel"
 MEAN_FILE = "..\\models\\game_models\\"+FOLDER+"\\mean.binaryproto"
 
 current_milli_time = lambda: int(round(time.time() * 1000))
@@ -60,24 +61,28 @@ def keyPressByCls(cls):
     start_ts = current_milli_time()
     print 'KeyPressByCls = ', cls
     if cls == 0:
-        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
+        #win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
         win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_LEFT, 0)
-        while current_milli_time() - start_ts < 300:
+        while current_milli_time() - start_ts < 100:
             continue
         win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_LEFT, 0)
-        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
+        #while current_milli_time() - start_ts < 20:
+        #    continue
+        #win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
     elif cls == 1:
         win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
-        while current_milli_time() - start_ts < 500:
+        while current_milli_time() - start_ts < 50:
             continue
         win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
     else:
-        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
+        #win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
         win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_RIGHT, 0)
-        while current_milli_time() - start_ts < 300:
+        while current_milli_time() - start_ts < 100:
             continue
         win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_RIGHT, 0)
-        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
+        #while current_milli_time() - start_ts < 20:
+        #    continue
+        #win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
 
 
 def get_net(caffemodel, deploy_file, use_gpu=True):
@@ -200,7 +205,7 @@ def OnKeyboardEvent(event):
             elif event.KeyID == 39: # right
                 right_num += 1
                 label='1'
-            elif event.KeyID == 37: # up
+            elif event.KeyID == 38: # up
                 return True
             elif event.KeyID == 27: # ESC
                 stop = True
@@ -226,13 +231,14 @@ def PredictThread():
         im = im.resize((256,256), Image.BILINEAR)
         # convert image to numpy array
         pix = np.array(im)
-        print 'size of matrix = ', pix.shape
+        dur_time_in_ms = current_milli_time() - start_ts
+        print 'size of matrix = %s, capture cause %d ms' %(str(pix.shape), dur_time_in_ms)
         #pix = scipy.misc.imresize(pix, (256, 256), 'bilinear')
         scores = forward_pass([pix], net, transformer)
         guess_action = scores.argmax()
         dur_time_in_ms = current_milli_time() - start_ts
         print 'action = %s, cause %d ms' %(classToLabel(guess_action), dur_time_in_ms)
-        keyPressByCls(guess_action)
+        thread.start_new_thread(keyPressByCls, (guess_action,))
         idx += 1
 
 # start main function here #
