@@ -24,7 +24,7 @@ left_num = 0
 right_num = 0
 up_num = 0
 
-FOLDER = "20161118-181518-32f4_epoch_30.0"
+FOLDER = "20161122-163240-bfc7_epoch_30.0"
 DEPLOY_FILE = "..\\models\\game_models\\"+FOLDER+"\\deploy.prototxt"
 CAFFE_MODE_FILE = "..\\models\\game_models\\"+FOLDER+"\\snapshot_iter_420.caffemodel"
 MEAN_FILE = "..\\models\\game_models\\"+FOLDER+"\\mean.binaryproto"
@@ -61,29 +61,28 @@ def keyPressByCls(cls):
     start_ts = current_milli_time()
     print 'KeyPressByCls = ', cls
     if cls == 0:
-        #win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
         win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_LEFT, 0)
-        while current_milli_time() - start_ts < 100:
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
+        while current_milli_time() - start_ts < 80:
+            continue
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
+        while current_milli_time() - start_ts < 60:
             continue
         win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_LEFT, 0)
-        #while current_milli_time() - start_ts < 20:
-        #    continue
-        #win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
     elif cls == 1:
         win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
-        while current_milli_time() - start_ts < 50:
+        while current_milli_time() - start_ts < 100:
             continue
         win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
     else:
-        #win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
         win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_RIGHT, 0)
-        while current_milli_time() - start_ts < 100:
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYDOWN, win32con.VK_UP, 0)
+        while current_milli_time() - start_ts < 80:
+            continue
+        win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
+        while current_milli_time() - start_ts < 60:
             continue
         win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_RIGHT, 0)
-        #while current_milli_time() - start_ts < 20:
-        #    continue
-        #win32api.SendMessage(target_hwnd, win32con.WM_KEYUP, win32con.VK_UP, 0)
-
 
 def get_net(caffemodel, deploy_file, use_gpu=True):
     """
@@ -238,7 +237,8 @@ def PredictThread():
         guess_action = scores.argmax()
         dur_time_in_ms = current_milli_time() - start_ts
         print 'action = %s, cause %d ms' %(classToLabel(guess_action), dur_time_in_ms)
-        thread.start_new_thread(keyPressByCls, (guess_action,))
+        keyPressByCls(guess_action)
+        #thread.start_new_thread(keyPressByCls, (guess_action,))
         idx += 1
 
 # start main function here #
