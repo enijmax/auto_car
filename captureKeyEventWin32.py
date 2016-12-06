@@ -1,5 +1,5 @@
 import pythoncom, pyHook
-import thread
+import thread, threading
 import datetime, time
 import Queue
 import shutil
@@ -14,75 +14,100 @@ right_num = 0
 acc_num = 0
 brk_num = 0
 key_file = time.strftime('%Y-%m-%d_%H-%M-%S.txt')
+lock = threading.Lock()
+g_pkeyb = 0
+
+KC_LEFT = 37
+KC_UP = 38
+KC_RIGHT = 39
+KC_DN = 40
+
+TAG_ACC_LEFT = "ACC_LEFT"
+TAG_ACC_RIGHT = "ACC_RIGHT"
+TAG_BRK_LEFT = "BRK_LEFT"
+TAG_BRK_RIGHT = "BRK_RIGHT"
+TAG_ACC = "ACC"
+TAG_BRK = "BRK"
+TAG_LEFT = "LEFT"
+TAG_RIGHT = "RIGHT"
+
+B_ACC_LEFT = 10
+B_ACC_RIGHT = 9
+B_ACC = 8
+B_BRK_LEFT = 6
+B_BRK_RIGHT = 5
+B_BRK = 4
+B_LEFT = 2
+B_RIGHT = 1
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
+def ConvKeyIDToBit(pkey):
+    if (pkey == KC_LEFT):
+        return B_LEFT
+    elif (pkey == KC_RIGHT):
+        return B_RIGHT
+    elif (pkey == KC_UP):
+        return B_ACC
+    elif (pkey == KC_DN):
+        return B_BRK
+
+# If key pressed , release it, if not pressed, pressed it.
+def SetKeyStatueSwitch(pkey):
+    global g_pkeyb
+    bkey = ConvKeyIDToBit(pkey)
+    if (bkey in (B_ACC, B_BRK, B_LEFT, B_RIGHT)):
+        with lock:
+            g_pkeyb = g_pkeyb ^ bkey
+        return True
+    return False
+
 def OnKeyboardEvent(event):
     global stop, left_num, right_num, brk_num, acc_num
-    print 'MessageName:',event.MessageName
-    #print 'Message:',event.Message
-    print 'Time:',current_milli_time()
-    #print 'Window:',event.Window
-    #print 'WindowName:',event.WindowName
-    #print 'Ascii:', event.Ascii, chr(event.Ascii)
-    print 'Key:', event.Key
-    print 'KeyID:', event.KeyID
-    #print 'ScanCode:', event.ScanCode
-    #print 'Extended:', event.Extended
-    #print 'Injected:', event.Injected
-    #print 'Alt', event.Alt
-    #print 'Transition', event.Transition
-    print '---'
+    label = "N"
 
     if event.KeyID == 27: #ESC to leave
         stop = True
         f.close()
         return True
 
-    if event.KeyID in (37, 38, 39, 40):
-        if event.MessageName == 'key down':
-            if event.KeyID == 37: # left
-                left_num += 1
-                label='-1'
-            elif event.KeyID == 39: # right
-                right_num += 1
-                label='1'
-            elif event.KeyID == 40: # break
-                brk_num += 1
-                label='b'
-            elif event.KeyID == 38: # acc
-                acc_num += 1
-                label='0'
+    if event.KeyID in (KC_LEFT, KC_RIGHT, KC_UP, KC_DN):
+        print 'MessageName:',event.MessageName
+        print 'Time:',current_milli_time()
+        print 'Key:', event.Key
+        print 'KeyID:', event.KeyID
+        print '---'
 
-            f.write(str(current_milli_time()) + ':' + label + '\n')
-            # put the key into queue
-        else:
-            # Key Up
-            dtime = current_milli_time()
-            stime = 0
-            label = '0'
-            if event.KeyID == 37:
-                stime = leftQ.get()
-                dtime = 0 - (dtime - stime) / 1000
-            elif event.KeyID == 39:
-                stime = rightQ.get()
-                dtime = (dtime - stime) / 1000
+        if (SetKeyStatueSwitch(event.KeyID) == False):
+            print 'Not expected KEY:', event.KeyID
+        # get key flags
+        if (g_pkeyb & B_ACC_RIGHT) == B_ACC_RIGHT:
+            right_num += 1
+            label = TAG_ACC_RIGHT
+        elif (g_pkeyb & B_ACC_LEFT) == B_ACC_LEFT:
+            left_num += 1
+            label = TAG_ACC_LEFT
+        elif (g_pkeyb & B_BRK_RIGHT) == B_BRK_RIGHT:
+            right_num += 1
+            label = TAG_BRK_RIGHT
+        elif (g_pkeyb & B_BRK_LEFT) == B_BRK_LEFT:
+            left_num += 1
+            label = TAG_BRK_LEFT
+        elif (g_pkeyb & B_ACC) == B_ACC: # Acc
+            acc_num += 1
+            label = TAG_ACC
+        elif (g_pkeyb & B_BRK) == B_BRK: # Brake
+            brk_num += 1
+            label = TAG_BRK
+        elif (g_pkeyb & B_LEFT) == B_LEFT: # Left
+            left_num += 1
+            label = TAG_LEFT
+        elif (g_pkeyb & B_RIGHT) == B_RIGHT: # Right
+            right_num += 1
+            label = TAG_RIGHT
 
-            if dtime > 1.5:
-                label = '3'
-            elif 0.75 < dtime <= 1.5:
-                label = '2'
-            elif 0 < dtime <= 0.75:
-                label = '1'
-            elif dtime < -1.5:
-                label = '-3'
-            elif -1.5 <= dtime < -0.75:
-                label = '-2'
-            elif -0.75 <= dtime < 0:
-                label = '-1'
-            else:
-                label = '0'
-            f.write(str(stime) + ':' + label + '\n')
+        f.write(str(current_milli_time()) + ':' + label + '\n')
+
     # return True to pass the event to other handlers
     return True
 
@@ -152,7 +177,7 @@ def labelingFrames(k_f, v_f):
             if frame_ts - curr_frame_ts > 500: # 500ms to capture one screen
                 if frame is not None:
                     print "class: n - " + str(frame_ts)
-                    cv2.imwrite("n/"+str(frame_ts)+'.png', frame)
+                    cv2.imwrite("n/"+str(frame_ts)+'.png', frame)   # save the frame as n-class if user didn't press anykey
                     neture_num += 1
                     frame = None
                 curr_frame_ts = frame_ts
@@ -172,6 +197,7 @@ def labelingFrames(k_f, v_f):
         if -33 <= delta_t <= 33 and frame is not None:
             # this is the right frame, save it to the ts[1] folder
             print "class: "+ts[1] + ' - ' +ts[0]
+            cv2.imshow('video', frame)
             cv2.imwrite(ts[1]+'/'+str(frame_ts)+'.png', frame)
             if ts[1] == '-1':
                 left_num += 1
@@ -183,6 +209,10 @@ def labelingFrames(k_f, v_f):
                 acc_num += 1
             elif ts[1] == 'n':
                 neture_num += 1
+
+        # Press esc to quit the program
+        if cv2.waitKey(1) == 27:
+            break
 
     print "================Summary==================\nLeft:"+str(left_num)+"\nNeture:"+str(neture_num)+"\nAcc:"+str(acc_num)+"\nRight:"+str(right_num)+"\nBreak:"+str(brk_num)
     vidcap.release()
